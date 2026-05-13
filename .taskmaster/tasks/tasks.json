@@ -1,0 +1,1790 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Set up Neon Postgres project with initial schema and RLS",
+        "description": "Create Neon serverless Postgres database, implement row-level security policies, and seed initial users table structure for Auth.js adapter.",
+        "details": "Use Neon console to create project (free tier sufficient for MVP). Enable Postgres RLS with policies: `CREATE POLICY user_isolation ON users FOR ALL USING (auth.uid() = id);`. Install @neondatabase/serverless driver v0.9.4 (latest 2026). Run initial migration with Drizzle ORM v0.33.0: `npx drizzle-kit generate:pg --schema ./src/db/schema.ts`. Seed default routines post-auth. Tech: Neon Postgres, Drizzle ORM 0.33.0, @neondatabase/serverless 0.9.4.",
+        "testStrategy": "Verify RLS blocks cross-user access via test user accounts. Confirm schema with `drizzle-kit studio`. Check seeded data queryable only by owner.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Neon Postgres project in free tier",
+            "description": "Sign up or log into Neon console and create a new serverless Postgres project using the free tier suitable for MVP development.",
+            "dependencies": [],
+            "details": "Follow Neon console steps: enter project name, select Postgres version, database name, closest region, and click 'Create project'. Copy the connection string for later use.",
+            "status": "pending",
+            "testStrategy": "Verify project appears in Neon dashboard with active status and free tier limits visible."
+          },
+          {
+            "id": 2,
+            "title": "Define initial users schema for Auth.js adapter",
+            "description": "Create the Drizzle ORM schema file defining the users table structure compatible with Auth.js adapter requirements.",
+            "dependencies": [],
+            "details": "In ./src/db/schema.ts, define users table with essential columns like id (uuid primary key), email, name, etc. Ensure auth.uid() compatible id field for RLS policy.",
+            "status": "pending",
+            "testStrategy": "Validate schema syntax with TypeScript compiler and review structure matches Auth.js adapter docs."
+          },
+          {
+            "id": 3,
+            "title": "Install Neon driver and generate initial migration",
+            "description": "Install specified @neondatabase/serverless driver and Drizzle ORM, then generate and apply the Postgres migration.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Run 'npm i @neondatabase/serverless@0.9.4 drizzle-orm@0.33.0 drizzle-kit'. Execute 'npx drizzle-kit generate:pg --schema ./src/db/schema.ts' and apply migration to Neon DB.",
+            "status": "pending",
+            "testStrategy": "Confirm migration files generated, run 'drizzle-kit studio' to verify users table exists in Neon database."
+          },
+          {
+            "id": 4,
+            "title": "Enable RLS and create user isolation policy",
+            "description": "Connect to Neon database and enable row-level security on users table with the specified isolation policy.",
+            "dependencies": [
+              3
+            ],
+            "details": "Execute SQL: 'ALTER TABLE users ENABLE ROW LEVEL SECURITY; CREATE POLICY user_isolation ON users FOR ALL USING (auth.uid() = id);'. Verify policy creation.",
+            "status": "pending",
+            "testStrategy": "Test policy blocks unauthorized access: insert test rows, query as different auth.uid() - expect no cross-user data visibility."
+          },
+          {
+            "id": 5,
+            "title": "Seed initial users table data and routines",
+            "description": "Implement and run seeding script for default users table structure post-auth setup, ensuring data respects RLS.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create seed script using Drizzle to insert initial data or routines. Run after auth integration. Ensure seeded data queryable only by respective owners.",
+            "status": "pending",
+            "testStrategy": "Execute seed script, verify data present via owner queries, confirm RLS blocks access for other users."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Implement day_plans database schema and migration",
+        "description": "Create day_plans table matching REQ-001 TypeScript interface with proper indexes and constraints.",
+        "details": "Drizzle schema: `dayPlans: pgTable('day_plans', { id: uuid().defaultRandom().primaryKey(), userId: uuid().notNull().references(() => users.id, { onDelete: 'cascade' }), date: date().notNull(), energy: 'low'|'medium'|'high'.notNull().default('medium'), workPriorities: jsonb().notNull().default('[\"\",\"\",\"\"]'), priorityDone: jsonb().notNull().default('[false,false,false]'), nightMode: 'mic'|'light'|'rest'|'open'.notNull().default('open'), notToday: text(), morningRoutineId: uuid(), eveningRoutineId: uuid(), displaySentAt: timestamp(), createdAt: timestamp().defaultNow(), updatedAt: timestamp().defaultNow().$onUpdate(() => now()), }, (table) => ({ userDateUnique: unique().on(table.userId, table.date), dateIdx: index('day_plans_date_idx').on(table.date), }))`. Add unique constraint (user_id, date) for idempotency.",
+        "testStrategy": "Insert duplicate (user,date) records fail. Query confirms indexes created. Migration runs clean on test DB branch.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Verify and update Drizzle schema for day_plans table",
+            "description": "Review existing schema against REQ-001 interface and add any missing fields or constraints before migration.",
+            "dependencies": [],
+            "details": "Ensure all fields match TypeScript interface: id, userId (FK cascade), date, energy enum, workPriorities jsonb, priorityDone jsonb, nightMode enum, notToday text, morningRoutineId uuid, eveningRoutineId uuid, displaySentAt timestamp. Confirm references to users table exist.",
+            "status": "pending",
+            "testStrategy": "Schema validation: run drizzle-kit generate and check generated SQL matches expected structure."
+          },
+          {
+            "id": 2,
+            "title": "Add unique constraint on (userId, date) for idempotency",
+            "description": "Implement unique index on userId and date columns to prevent duplicate day plans per user per date.",
+            "dependencies": [
+              1
+            ],
+            "details": "Update table definition: unique().on(table.userId, table.date) named 'userDateUnique'. Verify existing index('day_plans_date_idx') is preserved. Ensure constraint name is explicit for migration clarity.",
+            "status": "pending",
+            "testStrategy": "Insert duplicate (userId, date) record → expect unique violation error."
+          },
+          {
+            "id": 3,
+            "title": "Add and validate indexes for query performance",
+            "description": "Ensure proper indexes on frequently queried fields: date and userId for efficient lookups.",
+            "dependencies": [
+              1
+            ],
+            "details": "Confirm dateIdx: index('day_plans_date_idx').on(table.date). Consider composite index on (userId, date) if not covered by unique constraint. Add userId index if missing for FK lookups.",
+            "status": "pending",
+            "testStrategy": "Query EXPLAIN ANALYZE on SELECT by date and userId → confirm index usage."
+          },
+          {
+            "id": 4,
+            "title": "Generate and review database migration files",
+            "description": "Use Drizzle Kit to generate migration SQL from updated schema and validate generated migration.",
+            "dependencies": [
+              2
+            ],
+            "details": "Run `drizzle-kit generate:pg` → review SQL for CREATE TABLE day_plans, indexes, constraints, defaults. Check foreign key references to users table. Ensure no data loss or conflicts with existing schema.",
+            "status": "pending",
+            "testStrategy": "Migration preview: dry-run on staging DB → no errors, correct table structure."
+          },
+          {
+            "id": 5,
+            "title": "Test migration execution on test database",
+            "description": "Execute migration on isolated test database branch and validate table structure post-migration.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create fresh test DB → run migration → verify: table exists, columns match schema, indexes/constraints present, defaults work, FK cascade configured. Test idempotency by attempting duplicate insert.",
+            "status": "pending",
+            "testStrategy": "Post-migration: DESCRIBE day_plans, test unique constraint violation, verify indexes with pg_indexes view."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Create routines and routine_steps database schemas",
+        "description": "Implement REQ-003 schemas for reusable morning/evening routine checklists with steps.",
+        "details": "Schemas: `routines: pgTable('routines', { id: uuid().defaultRandom().primaryKey(), userId: uuid().notNull().references(() => users.id), kind: 'morning'|'evening'.notNull(), name: varchar(100).notNull(), }), routineSteps: pgTable('routine_steps', { id: uuid().defaultRandom().primaryKey(), routineId: uuid().notNull().references(() => routines.id, { onDelete: 'cascade' }), label: text().notNull(), durationMinutes: integer(), trigger: text(), minimumVersion: text(), position: integer().notNull().default(0), }, (table) => ({ routinePosUnique: unique().on(table.routineId, table.position), }))`. Seed 1 morning + 1 evening routine per user on signup.",
+        "testStrategy": "Confirm cascade delete works. Verify position uniqueness per routine. Seed script creates expected defaults.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define routines and routine_steps schemas in Drizzle",
+            "description": "Create the PostgreSQL table definitions for routines and routine_steps tables using the provided schema specifications in the database schema file.",
+            "dependencies": [],
+            "details": "Use pgTable from Drizzle ORM. Implement routines table with id (uuid PK), userId (references users.id), kind ('morning'|'evening'), name (varchar(100)). Implement routine_steps with id (uuid PK), routineId (references routines.id with cascade delete), label (text), durationMinutes (integer), trigger (text), minimumVersion (text), position (integer default 0). Add unique constraint on (routineId, position).",
+            "status": "pending",
+            "testStrategy": "Run drizzle-kit studio to verify schema structure matches specifications including foreign keys and unique constraints."
+          },
+          {
+            "id": 2,
+            "title": "Generate and apply database migration",
+            "description": "Use Drizzle Kit to generate PostgreSQL migration from schema changes and apply it to the Neon database.",
+            "dependencies": [
+              1
+            ],
+            "details": "Execute 'npx drizzle-kit generate:pg --schema ./src/db/schema.ts' then 'npx drizzle-kit push:pg'. Verify migration creates tables with correct constraints using Neon console or pgAdmin.",
+            "status": "pending",
+            "testStrategy": "Check Neon database shows new tables with correct columns, indexes, and foreign key relationships via SQL query or Drizzle Studio."
+          },
+          {
+            "id": 3,
+            "title": "Implement routine_steps position uniqueness constraint",
+            "description": "Ensure no duplicate positions within the same routine by properly configuring the unique index on routine_steps.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "In schema definition, use unique().on(table.routineId, table.position) as specified. Test by attempting to insert duplicate position for same routineId - should fail.",
+            "status": "pending",
+            "testStrategy": "Insert two steps with same routineId and position=1; second insert should throw unique constraint violation error."
+          },
+          {
+            "id": 4,
+            "title": "Create seed script for default routines",
+            "description": "Write database seed function to create 1 morning and 1 evening routine with steps for each new user on signup.",
+            "dependencies": [
+              2
+            ],
+            "details": "Create seed script in /db/seed.ts using Drizzle transactions. For each user, insert default routines: morning routine with 3-5 steps (wake up, exercise, breakfast), evening routine with steps (dinner, reading, sleep prep). Use sequential positions starting from 1.",
+            "status": "pending",
+            "testStrategy": "Create test user, trigger signup seed, verify exactly 2 routines (morning+evening) with appropriate steps exist for that userId only."
+          },
+          {
+            "id": 5,
+            "title": "Test cascade delete and RLS integration",
+            "description": "Verify routine_steps cascade deletion works and tables respect existing RLS user isolation policies.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Test deleting a routine cascades to delete all its steps. Confirm user A cannot access user B's routines due to RLS policy on users table extending to routines via foreign key.",
+            "status": "pending",
+            "testStrategy": "1) Delete routine, confirm steps gone. 2) As user A, query user B's routines - should return empty. 3) Verify seed creates user-specific routines visible only to owner."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Set up Next.js 15 App Router project with Tailwind and shadcn/ui",
+        "description": "Initialize Next.js application with App Router, Tailwind CSS v4.0, and shadcn/ui components following specified tech stack.",
+        "details": "Use `npx create-next-app@15 top3 --typescript --tailwind --eslint --app --src-dir --import-alias=\"@/*\"`. Install shadcn/ui: `npx shadcn-ui@latest init`. Add components: `npx shadcn-ui@latest add button card input select`. Configure Tailwind for mobile-first (screens: sm: 640px). Set up ESLint + Prettier. Environment: NEXT_PUBLIC_NEON_URL. Tech: Next.js 15.0.0, Tailwind CSS 4.0, shadcn/ui 0.9.0.",
+        "testStrategy": "App builds and runs on iOS Safari 16+. Tailwind classes compile. shadcn components render correctly.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Next.js 15 project with specified flags",
+            "description": "Run the create-next-app command to scaffold the project with TypeScript, Tailwind, ESLint, App Router, src-dir, and import alias.",
+            "dependencies": [],
+            "details": "Execute: npx create-next-app@15 top3 --typescript --tailwind --eslint --app --src-dir --import-alias='@/*'. Verify Next.js version 15.0.0 in package.json after installation completes.",
+            "status": "pending",
+            "testStrategy": "Check package.json for correct Next.js version and flags applied. Run npm run dev to ensure project starts without errors."
+          },
+          {
+            "id": 2,
+            "title": "Install and initialize shadcn/ui v0.9.0",
+            "description": "Add shadcn/ui to the project and run initialization to set up components.json and Tailwind integration.",
+            "dependencies": [
+              1
+            ],
+            "details": "Run npx shadcn-ui@latest init ensuring version 0.9.0. Confirm components.json created with proper Tailwind and path configurations matching src/@/* alias.",
+            "status": "pending",
+            "testStrategy": "Verify components.json exists and references correct Tailwind config and src paths. Check no errors in terminal output."
+          },
+          {
+            "id": 3,
+            "title": "Add essential shadcn/ui components",
+            "description": "Install button, card, input, and select components using shadcn CLI for immediate use in the app.",
+            "dependencies": [
+              2
+            ],
+            "details": "Execute: npx shadcn-ui@latest add button card input select. Components will be added to src/components/ui/ directory with TypeScript definitions.",
+            "status": "pending",
+            "testStrategy": "Confirm .tsx files exist in src/components/ui/. Import and render one component in app/page.tsx to verify Tailwind styles apply."
+          },
+          {
+            "id": 4,
+            "title": "Configure Tailwind CSS v4.0 for mobile-first",
+            "description": "Update Tailwind config to use v4.0 syntax and set mobile-first screens starting at sm:640px.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install @tailwindcss/postcss if needed. Update tailwind.config.ts: screens: { sm: '640px' }, content: ['./src/**/*.{js,ts,jsx,tsx}']. Use @import 'tailwindcss' in src/app/globals.css.",
+            "status": "pending",
+            "testStrategy": "Run npm run dev, inspect CSS output for v4.0 classes. Test responsive design by resizing browser to confirm sm:640px breakpoint works."
+          },
+          {
+            "id": 5,
+            "title": "Set up ESLint, Prettier, and environment variable",
+            "description": "Configure code formatting tools and add Neon database environment variable placeholder.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install Prettier and eslint-config-prettier: npm i -D prettier eslint-config-prettier. Add .prettierrc with semi:false, singleQuote:true. Create .env.local with NEXT_PUBLIC_NEON_URL=placeholder.",
+            "status": "pending",
+            "testStrategy": "Run npm run lint and npm run build. Verify no ESLint/Prettier errors. Check app runs with env var accessible via process.env.NEXT_PUBLIC_NEON_URL."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Implement Auth.js magic-link authentication with Neon adapter",
+        "description": "Set up passwordless email authentication using Auth.js with Resend provider and Neon database adapter.",
+        "details": "Install `next-auth@5.0.0-beta.24 @auth/drizzle-adapter@1.12.1 resend@4.0.0`. Configure `auth.ts`: EmailProvider with Resend API key. Custom Neon adapter: `new DrizzleNeonAdapter({ connection: { url: process.env.NEON_URL! } })`. Add middleware protection for /app/* routes. Magic link template via Resend. Sessions use secure cookies (httpOnly, secure, sameSite: 'lax').",
+        "testStrategy": "Send magic link → click → authenticated session. Verify users table populated. Test logout + token expiry.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Install Auth.js, Drizzle-Neon Adapter, and Resend Dependencies",
+            "description": "Install the specified package versions for Auth.js v5 beta, Drizzle Neon adapter, and Resend email provider.",
+            "dependencies": [],
+            "details": "Run `npm install next-auth@5.0.0-beta.24 @auth/drizzle-adapter@1.12.1 resend@4.0.0`. Verify installation by checking package.json and node_modules. Ensure no version conflicts with existing dependencies.",
+            "status": "pending",
+            "testStrategy": "Check `npm list next-auth @auth/drizzle-adapter resend` outputs correct versions without errors."
+          },
+          {
+            "id": 2,
+            "title": "Configure auth.ts with EmailProvider and Neon Drizzle Adapter",
+            "description": "Set up Auth.js configuration file using Resend for EmailProvider and custom DrizzleNeonAdapter with Neon URL.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create/update `auth.ts` in lib or app/api/auth/[...nextauth]/route.ts. Configure EmailProvider({ apiKey: process.env.RESEND_API_KEY }), adapter: new DrizzleNeonAdapter({ connection: { url: process.env.NEON_URL! } }). Add session: { strategy: 'jwt' }.",
+            "status": "pending",
+            "testStrategy": "Validate TypeScript compilation succeeds and env vars are properly referenced without runtime errors."
+          },
+          {
+            "id": 3,
+            "title": "Implement Custom Magic Link Email Template via Resend",
+            "description": "Create and configure a custom HTML email template for magic links sent via Resend provider.",
+            "dependencies": [
+              2
+            ],
+            "details": "In auth.ts EmailProvider config, add template for magic link with button/link to `${baseUrl}/api/auth/callback/email?token=${token}`. Use Resend design guidelines for secure, branded template with expiration notice.",
+            "status": "pending",
+            "testStrategy": "Trigger signIn('resend', { email: 'test@example.com' }) and verify custom template appears in Resend dashboard/emails."
+          },
+          {
+            "id": 4,
+            "title": "Configure Secure Session Cookies and Add Middleware Protection",
+            "description": "Set secure cookie options for sessions and protect /app/* routes with Auth.js middleware.",
+            "dependencies": [
+              2
+            ],
+            "details": "In auth.ts, configure cookies: { sessionToken: { name: '__Secure-next-auth.session-token', options: { httpOnly: true, secure: true, sameSite: 'lax' } } }. Create middleware.ts with matcher: '/app/:path*', auth middleware.",
+            "status": "pending",
+            "testStrategy": "Unauthenticated access to /app/* redirects to signin. Inspect cookies for httpOnly/secure/sameSite=lax flags."
+          },
+          {
+            "id": 5,
+            "title": "Create Sign-in Page and Test Complete Magic Link Flow",
+            "description": "Build sign-in UI and verify end-to-end authentication flow with database verification.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Create app/auth/signin/page.tsx with email input and signIn('resend'). Test: send magic link → click → session created, users/verification_tokens tables populated. Add logout functionality.",
+            "status": "pending",
+            "testStrategy": "Send magic link → click → authenticated session with secure cookies. Verify users table populated. Test logout + token expiry after maxAge."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement DayPlan CRUD API endpoints (REQ-001)",
+        "description": "Create POST/GET/PATCH endpoints for DayPlan with idempotency, timezone handling, and validation.",
+        "details": "Route handlers `/api/v1/day-plans/route.ts`, `/api/v1/day-plans/today/route.ts`, `/api/v1/day-plans/[id]/route.ts`. Use server actions for client calls. Idempotency: `SELECT * FROM day_plans WHERE user_id = $1 AND date = $2`. Timezone: `date.toLocaleDateString('en-CA', { timeZone: user.timezone })`. Zod validation: `z.object({ energy: z.enum(['low','medium','high']), work_priorities: z.array(z.string()).length(3), ... })`. Update `display_sent_at` on send.",
+        "testStrategy": "POST idempotent, GET today returns local date, PATCH partial updates work. Integration tests hit test DB.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement POST /api/v1/day-plans with idempotency and validation",
+            "description": "Create the POST endpoint handler in route.ts that checks for existing DayPlan by user_id and date, validates input with Zod, handles timezone, and creates or returns existing record.",
+            "dependencies": [],
+            "details": "Use SQL: SELECT * FROM day_plans WHERE user_id = $1 AND date = $2 for idempotency check. Apply Zod schema: z.object({ energy: z.enum(['low','medium','high']), work_priorities: z.array(z.string()).length(3), ... }). Convert date using date.toLocaleDateString('en-CA', { timeZone: user.timezone }).",
+            "status": "pending",
+            "testStrategy": "Test idempotent POST returns existing record on duplicate; invalid Zod data returns 400; valid create inserts new record."
+          },
+          {
+            "id": 2,
+            "title": "Implement GET /api/v1/day-plans/today with timezone handling",
+            "description": "Create the today endpoint handler that fetches the current DayPlan for the user based on their local timezone date.",
+            "dependencies": [],
+            "details": "In /api/v1/day-plans/today/route.ts, compute today date with date.toLocaleDateString('en-CA', { timeZone: user.timezone }), query day_plans WHERE user_id = $1 AND date = $2, return 404 if not found.",
+            "status": "pending",
+            "testStrategy": "GET today returns correct DayPlan for user's local date; different timezones return expected records; 404 for no plan today."
+          },
+          {
+            "id": 3,
+            "title": "Implement PATCH /api/v1/day-plans/[id] with partial updates",
+            "description": "Create the PATCH endpoint handler in [id]/route.ts that validates and applies partial updates to existing DayPlan.",
+            "dependencies": [],
+            "details": "In /api/v1/day-plans/[id]/route.ts, fetch DayPlan by id and user_id ownership check, use Zod for partial schema validation, apply updates with Drizzle, support fields like priorityDone, notToday.",
+            "status": "pending",
+            "testStrategy": "PATCH partial updates modify only provided fields; invalid id or non-owned returns 404/403; Zod validation rejects bad data."
+          },
+          {
+            "id": 4,
+            "title": "Add server actions for client-side DayPlan CRUD calls",
+            "description": "Create server actions that wrap the API endpoints for use in client components, handling auth and errors.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Define server actions like createDayPlan, getTodayDayPlan, updateDayPlan using the route handlers or direct DB calls, include revalidatePath for caching, handle user session.",
+            "status": "pending",
+            "testStrategy": "Client calls server actions trigger correct endpoint logic; auth required; errors propagate to client."
+          },
+          {
+            "id": 5,
+            "title": "Implement display_sent_at update and integration tests",
+            "description": "Add logic to update display_sent_at timestamp when DayPlan is sent, and write integration tests hitting test DB.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "On successful POST/PATCH when 'send' flag or endpoint indicates sending, UPDATE day_plans SET display_sent_at = now() WHERE id = $1. Write tests: POST idempotent, GET today local date, PATCH partial updates.",
+            "status": "pending",
+            "testStrategy": "Integration tests: POST idempotent creates/returns existing, GET today uses local date, PATCH partial works, display_sent_at updates on send, all hit test DB."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Build Today screen layout with date/weekday header",
+        "description": "Create responsive Today screen with date header, energy selector, and primary layout structure (REQ-002).",
+        "details": "App Router page `/app/today/page.tsx` as Server Component. Header: `<Card><h1>{date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</h1></Card>`. Energy selector: shadcn Select with low/medium/high. Mobile-first Tailwind: `max-w-md mx-auto p-4`. Load time <1s via SSR. Use `useSession` from next-auth/react.",
+        "testStrategy": "Page renders <1s cold load. Date shows local timezone. Energy selector keyboard accessible (WCAG AA).",
+        "priority": "high",
+        "dependencies": [
+          4,
+          5,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Today page Server Component structure",
+            "description": "Create the base App Router page at `/app/today/page.tsx` as a Server Component with mobile-first Tailwind layout.",
+            "dependencies": [],
+            "details": "Use `max-w-md mx-auto p-4` classes for responsive container. Import necessary shadcn/ui components like Card. Ensure SSR for <1s load time. Add basic page skeleton with session check placeholder.",
+            "status": "pending",
+            "testStrategy": "Page renders without errors in dev mode. Tailwind classes apply correctly on mobile viewport (375px)."
+          },
+          {
+            "id": 2,
+            "title": "Implement date/weekday header with Card component",
+            "description": "Add responsive header displaying current date with weekday, month, and day using specified locale format.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use `new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })` inside `<Card><h1>...</h1></Card>`. Style with Tailwind for full-width, centered text. Ensure local timezone display.",
+            "status": "pending",
+            "testStrategy": "Header shows correct local date format (e.g., 'Tue, Apr 28'). Responsive on mobile/desktop. WCAG AA contrast."
+          },
+          {
+            "id": 3,
+            "title": "Add energy selector using shadcn Select component",
+            "description": "Integrate shadcn/ui Select for low/medium/high energy levels with proper labeling and state management.",
+            "dependencies": [
+              1
+            ],
+            "details": "Place below header in layout. Options: low/medium/high with icons if available. Use local state with `useState` for selection. Ensure keyboard navigation and ARIA labels for accessibility.",
+            "status": "pending",
+            "testStrategy": "Select opens/closes on click/space. Keyboard navigable (arrow keys). Selected value persists on re-render."
+          },
+          {
+            "id": 4,
+            "title": "Integrate NextAuth session with useSession hook",
+            "description": "Add client-side session management using `useSession` from next-auth/react for authenticated layout rendering.",
+            "dependencies": [
+              1
+            ],
+            "details": "Convert necessary parts to Client Component with `'use client'`. Wrap content in `SessionProvider` if needed. Conditionally render user-specific elements or loading state. Handle unauthenticated redirect.",
+            "status": "pending",
+            "testStrategy": "Session loads <500ms. Authenticated user sees personalized content. Unauthenticated redirects to login."
+          },
+          {
+            "id": 5,
+            "title": "Finalize primary layout structure and performance checks",
+            "description": "Complete responsive layout assembly, optimize SSR load time, and validate all requirements (REQ-002).",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Assemble header + energy selector + placeholder content areas. Verify mobile-first responsive breakpoints. Measure cold load time <1s. Add loading skeleton if needed. Ensure full WCAG AA keyboard accessibility.",
+            "status": "pending",
+            "testStrategy": "Full page SSR load <1s (Lighthouse). Responsive across breakpoints (375px-1920px). Energy selector + date fully accessible."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Implement inline editable 3-priority card component",
+        "description": "Create editable priority fields with done toggles and character limits (REQ-002).",
+        "details": "Zustand store for client-side edits: `create((set) => ({ priorities: ['', '', ''], setPriority: (idx, val) => ... }))`. shadcn Input + Checkbox per priority. Sync on blur/save: `fetch('/api/v1/day-plans/today', { method: 'PATCH', body: JSON.stringify({ work_priorities }) })`. Max 100 chars/priority. Done state visual feedback.",
+        "testStrategy": "Edit → blur → API PATCH called. Character limit enforced. Done toggle persists. Mobile touch targets ≥44px.",
+        "priority": "high",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Zustand store for priorities state",
+            "description": "Implement the Zustand store to manage the three priority fields, their done states, and update functions as specified in the task details.",
+            "dependencies": [],
+            "details": "Use `create((set, get) => ({ priorities: ['', '', ''], priorityDone: [false, false, false], setPriority: (idx, val) => set({ priorities: get().priorities.map((p, i) => i === idx ? val.slice(0,100) : p) }), toggleDone: (idx) => set({ priorityDone: get().priorityDone.map((d, i) => i === idx ? !d : d) }) }))` with character limit enforcement.",
+            "status": "pending",
+            "testStrategy": "Verify store initializes with empty priorities and false done states. Test setPriority truncates at 100 chars. Test toggleDone flips specific indices."
+          },
+          {
+            "id": 2,
+            "title": "Design editable priority card UI structure",
+            "description": "Build the React component structure using shadcn Card, Input, and Checkbox components for each of the three priorities.",
+            "dependencies": [],
+            "details": "Create `<Card><div className='space-y-4'> {[0,1,2].map(idx => <div key={idx}><Input maxLength={100} placeholder={`Priority ${idx+1}`} /> <Checkbox /> <span>Done visual feedback</span></div>)} </div></Card>`. Add hover states for inline editing indication.",
+            "status": "pending",
+            "testStrategy": "Render test: 3 input+checkbox pairs display correctly. Inputs show placeholder text. Checkboxes render with shadcn styling."
+          },
+          {
+            "id": 3,
+            "title": "Connect UI to Zustand store with edit handlers",
+            "description": "Wire up the Input onChange and Checkbox onCheckedChange to Zustand store actions, implement blur detection for sync.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Use `useStore` hook: `<Input value={priorities[idx]} onChange={(e) => setPriority(idx, e.target.value)} onBlur={handleSync} /> <Checkbox checked={priorityDone[idx]} onCheckedChange={() => toggleDone(idx)} />`. Add visual feedback: strikethrough text when done.",
+            "status": "pending",
+            "testStrategy": "Type in input → store updates immediately. Check/uncheck → done state toggles + visual strikethrough. Blur triggers sync preparation."
+          },
+          {
+            "id": 4,
+            "title": "Implement API sync on blur and save button",
+            "description": "Create sync function that calls PATCH /api/v1/day-plans/today with current priorities and done states on blur events and explicit save.",
+            "dependencies": [
+              3
+            ],
+            "details": "`const handleSync = async () => { const { priorities, priorityDone } = useStore(); await fetch('/api/v1/day-plans/today', { method: 'PATCH', body: JSON.stringify({ work_priorities: priorities, priority_done: priorityDone }) }) }`. Call on each input blur and add Save button.",
+            "status": "pending",
+            "testStrategy": "Blur input → Network tab shows PATCH with correct JSON payload. Multiple blurs → single API call if unchanged. Save button triggers sync."
+          },
+          {
+            "id": 5,
+            "title": "Add character limits, validation, and mobile optimization",
+            "description": "Enforce 100 char limit display, add validation feedback, ensure mobile touch targets ≥44px, and finalize visual polish.",
+            "dependencies": [
+              4
+            ],
+            "details": "Input already has maxLength=100. Add counter `<span>{value.length}/100</span>`. Style checkboxes/inputs for 44px touch targets via min-height/padding. Add loading state during API calls. Ensure done priorities show strikethrough + dimmed.",
+            "status": "pending",
+            "testStrategy": "Type 101 chars → truncates to 100. Counter updates live. Mobile viewport → touch targets pass 44px rule. API loading spinner shows."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Add night mode selector and default from WeeklyPattern",
+        "description": "One-tap night mode selector with WeeklyPattern fallback (REQ-002, REQ-004 prep).",
+        "details": "shadcn Select: ['mic', 'light', 'rest', 'open']. Default: fetch WeeklyPattern weekday value or 'open'. Update DayPlan on change. Icons: Lucide-react Mic, Moon, Bed, Calendar. Visual badges differentiate modes.",
+        "testStrategy": "Selector cycles values. Defaults from weekly pattern. Persists to DayPlan. ARIA labels for screen readers.",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Install shadcn Select and Lucide-react icons",
+            "description": "Add shadcn/ui Select component and required Lucide-react icons for night mode options.",
+            "dependencies": [],
+            "details": "Run `npx shadcn-ui@latest add select`. Install `lucide-react` via npm. Import Mic, Moon, Bed, Calendar icons for use in selector options.",
+            "status": "pending",
+            "testStrategy": "Verify Select component renders without errors and icons display correctly in dev mode."
+          },
+          {
+            "id": 2,
+            "title": "Create WeeklyPattern query hook for night mode default",
+            "description": "Fetch user's WeeklyPattern night_mode for current weekday (0-6 Mon-Sun) with 'open' fallback.",
+            "dependencies": [],
+            "details": "Create `useWeeklyNightMode` hook using Drizzle query. Map current Date.getDay() to weekday. Return pattern.nightMode || 'open'. Handle loading/error states.",
+            "status": "pending",
+            "testStrategy": "Mock query returns weekday value. Test Tuesday returns correct pattern. Fallback to 'open' when no pattern exists."
+          },
+          {
+            "id": 3,
+            "title": "Build night mode Select component with icons and badges",
+            "description": "Implement shadcn Select with options ['mic','light','rest','open'] using Lucide icons and visual badges.",
+            "dependencies": [
+              1
+            ],
+            "details": "Map options to icons: Mic, Moon, Bed, Calendar. Add badge styling to differentiate modes (colors/shapes). Set initial value from WeeklyPattern hook. Include ARIA labels.",
+            "status": "pending",
+            "testStrategy": "Selector displays correct icon per option. Badges visually distinct. Screen reader announces options correctly."
+          },
+          {
+            "id": 4,
+            "title": "Implement onChange handler to update DayPlan",
+            "description": "Update DayPlan record with selected night_mode value on selector change.",
+            "dependencies": [
+              2
+            ],
+            "details": "Create `updateDayPlanNightMode` mutation. Pass new value to DayPlan.night_mode field. Optimistically update UI. Handle success/error with toast notifications.",
+            "status": "pending",
+            "testStrategy": "Selection change triggers DayPlan update. Value persists after refresh. Error handling shows user feedback."
+          },
+          {
+            "id": 5,
+            "title": "Integrate selector into Today/DayPlan screen",
+            "description": "Add complete night mode selector to DayPlan screen with proper layout and accessibility.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Position selector prominently (e.g., header/card). Ensure mobile-responsive layout. Add loading spinner during fetch/update. Test full flow: default → select → persist.",
+            "status": "pending",
+            "testStrategy": "End-to-end: Page loads with WeeklyPattern default. Change cycles through 4 values. Updates persist to DayPlan. ARIA labels work with screen readers."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Implement time-aware routine card display",
+        "description": "Read-only routine card that swaps morning/evening based on time-of-day cutoffs (REQ-002, REQ-003).",
+        "details": "Server Component fetches user's routine by time: `new Date().getHours() < 14 ? 'morning' : 'evening'`. Truncate steps to 4 lines. Low-energy mode substitutes minimum_version if energy='low'. Display: `<Card><ul>{steps.map(s => <li key={s.id}>{s.label}</li>)}</ul></Card>`.",
+        "testStrategy": "Manual time override tests morning/evening swap at 14:00/18:00. Low-energy shows minimum_version. No edit controls.",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create server component for time-aware routine fetching",
+            "description": "Implement Server Component that fetches user's morning or evening routine based on current time cutoff.",
+            "dependencies": [],
+            "details": "Use `new Date().getHours() < 14 ? 'morning' : 'evening'` to determine routine type. Query database for user's routine matching the time-based type. Return routine data including steps.",
+            "status": "pending",
+            "testStrategy": "Verify fetches correct routine type at 13:59 (morning) and 14:00 (evening) using mocked Date."
+          },
+          {
+            "id": 2,
+            "title": "Implement step truncation and low-energy substitution logic",
+            "description": "Process fetched routine steps: truncate to first 4 steps, substitute minimum_version if energy='low'.",
+            "dependencies": [
+              1
+            ],
+            "details": "Slice steps array to length 4. Check user energy level; if 'low', replace steps with routine.minimum_version steps. Ensure processed steps have id and label properties.",
+            "status": "pending",
+            "testStrategy": "Test truncation reduces >4 steps to 4; low energy swaps to minimum_version steps correctly."
+          },
+          {
+            "id": 3,
+            "title": "Design and implement routine card UI component",
+            "description": "Build read-only Card component displaying truncated steps as unordered list with no edit controls.",
+            "dependencies": [
+              2
+            ],
+            "details": "Use `<Card><ul>{steps.map(s => <li key={s.id}>{s.label}</li>)}</ul></Card>`. Ensure responsive design, proper spacing, and accessibility (ARIA labels for list). Style matches app theme.",
+            "status": "pending",
+            "testStrategy": "Snapshot test renders correct HTML structure; displays exactly 4 list items when truncated."
+          },
+          {
+            "id": 4,
+            "title": "Integrate server logic with client card display",
+            "description": "Connect Server Component data fetching to client-side Card rendering in Today screen.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Pass processed steps from server to Card component props. Handle loading/error states. Ensure hydration matches between server/client renders.",
+            "status": "pending",
+            "testStrategy": "End-to-end: renders correct routine at time boundaries; no hydration mismatches."
+          },
+          {
+            "id": 5,
+            "title": "Add manual time override testing and validation",
+            "description": "Implement test utilities for time overrides and validate morning/evening swap and low-energy display.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create test hook to mock Date for 14:00/18:00 cutoffs. Verify UI swaps routines correctly and shows minimum_version in low-energy mode. No edit buttons visible.",
+            "status": "pending",
+            "testStrategy": "Manual override tests confirm swap at cutoffs; low-energy displays substituted steps; integration tests pass."
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Create Send-to-display button with timestamp feedback",
+        "description": "Primary CTA triggers display sync and shows last-sent timestamp (REQ-002).",
+        "details": "Button: `async function sendToDisplay() { await fetch('/api/v1/day-plans/today', { method: 'PATCH', body: { display_sent_at: new Date().toISOString() } }); setLastSent(new Date()); }`. Toast notification: shadcn Sonner 'Sent to display'. Show relative time: '2 min ago'.",
+        "testStrategy": "Click → API PATCH → display_sent_at updates → timestamp shows. Offline graceful error.",
+        "priority": "high",
+        "dependencies": [
+          6,
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Install and import shadcn/ui Button and Sonner components",
+            "description": "Add required shadcn/ui Button and Sonner toast notification components to the project for the send-to-display functionality.",
+            "dependencies": [],
+            "details": "Run `npx shadcn-ui@latest add button toast` (Sonner via toast). Import Button from '@/components/ui/button', Toaster from 'sonner'. Add <Toaster /> to root layout.",
+            "status": "pending",
+            "testStrategy": "Verify Button renders with primary variant. Confirm Toaster appears in DOM without errors."
+          },
+          {
+            "id": 2,
+            "title": "Implement sendToDisplay API function with error handling",
+            "description": "Create the async sendToDisplay function that PATCHes the DayPlan API and updates local state, including offline graceful degradation.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use provided code: `async function sendToDisplay() { try { await fetch('/api/v1/day-plans/today', { method: 'PATCH', body: JSON.stringify({ display_sent_at: new Date().toISOString() }), headers: {'Content-Type': 'application/json'} }); setLastSent(new Date()); toast.success('Sent to display'); } catch(e) { toast.error('Failed to send (offline?)'); } }`.",
+            "status": "pending",
+            "testStrategy": "Mock fetch success → state updates + toast. Mock network error → error toast + no crash."
+          },
+          {
+            "id": 3,
+            "title": "Create Send-to-Display Button UI component",
+            "description": "Build the primary CTA Button using shadcn/ui that triggers sendToDisplay on click.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Use <Button onClick={sendToDisplay} variant='default' size='lg' className='w-full sm:w-auto'>Send to Display</Button>. Ensure responsive full-width on mobile.",
+            "status": "pending",
+            "testStrategy": "Click button → triggers sendToDisplay. Button shows loading if async in progress (add isPending state)."
+          },
+          {
+            "id": 4,
+            "title": "Add lastSent state and relative timestamp display",
+            "description": "Manage lastSent Date state and render it as human-readable relative time like '2 min ago' below the button.",
+            "dependencies": [
+              2
+            ],
+            "details": "Use useState<Date|null>(null) for lastSent. Render: lastSent ? <p className='text-sm text-muted-foreground mt-1'>{formatRelativeTime(lastSent)}</p> : null. Implement formatRelativeTime util with date-fns or custom logic.",
+            "status": "pending",
+            "testStrategy": "After send → timestamp shows 'just now' → advances to '1 min ago'. Null state shows nothing."
+          },
+          {
+            "id": 5,
+            "title": "Integrate button, timestamp, and toast into Day Plan page",
+            "description": "Place the complete Send-to-Display button with timestamp feedback as primary CTA in the relevant UI section.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "In DayPlan page/component: prominent placement (e.g., fixed bottom bar or hero section). Ensure accessible (aria-label). Test end-to-end flow.",
+            "status": "pending",
+            "testStrategy": "Full flow: Click → API PATCH → DB display_sent_at updates → UI timestamp + success toast. Verify offline error handling."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Implement Routines management screen and API",
+        "description": "CRUD interface for editing morning/evening routines and steps (REQ-003).",
+        "details": "Page `/app/routines/page.tsx`. Tabs: Morning/Evening. Drag-to-reorder steps (react-beautiful-dnd). API: `PATCH /api/v1/routines/:id` with position updates. Form: step label, duration, trigger, min-version. Cap at 6 steps/routine.",
+        "testStrategy": "Create/edit/delete routine. Reorder steps persist position. API roundtrip validation.",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Routines management page with Morning/Evening tabs",
+            "description": "Build the base React page at `/app/routines/page.tsx` with tabbed interface for Morning and Evening routines using client-side routing or state management.",
+            "dependencies": [],
+            "details": "Use shadcn/ui Tabs component. Fetch initial routine data via server component or SWR. Display empty state when no routines exist. Ensure responsive design for mobile/desktop.",
+            "status": "pending",
+            "testStrategy": "Tabs switch correctly. Page loads without errors. Empty state renders when no data."
+          },
+          {
+            "id": 2,
+            "title": "Implement drag-to-reorder steps using react-beautiful-dnd",
+            "description": "Add drag-and-drop functionality to reorder steps within each routine tab, enforcing max 6 steps limit.",
+            "dependencies": [
+              1
+            ],
+            "details": "Install and configure react-beautiful-dnd. Create DragDropContext, Droppable list, and Draggable step items. Update local state on drag end. Show warning when adding 7th step.",
+            "status": "pending",
+            "testStrategy": "Drag step up/down positions update. Max 6 steps enforced. Reorder persists on tab switch."
+          },
+          {
+            "id": 3,
+            "title": "Build step CRUD form with label, duration, trigger, min-version",
+            "description": "Create inline editable forms for adding/editing/deleting individual steps with all required fields.",
+            "dependencies": [
+              1
+            ],
+            "details": "Form fields: text input (label), number input (duration minutes), select (trigger types), select (min-version: full/low). Add/delete buttons per step. Validation: required label, duration 1-120min.",
+            "status": "pending",
+            "testStrategy": "Add new step appears. Edit updates fields. Delete removes step. Form validation blocks invalid input."
+          },
+          {
+            "id": 4,
+            "title": "Implement PATCH /api/v1/routines/:id API endpoint",
+            "description": "Create API handler for updating routines including position changes from drag-reorder operations.",
+            "dependencies": [],
+            "details": "Route: app/api/v1/routines/[id]/route.ts. Accept JSON payload with steps array including position indices. Use Drizzle for DB update with array position handling. Authenticate user ownership. Return 200 with updated routine.",
+            "status": "pending",
+            "testStrategy": "PATCH updates step positions correctly. Unauthorized requests return 401. Invalid data returns 400."
+          },
+          {
+            "id": 5,
+            "title": "Connect frontend to API with save/reorder persistence",
+            "description": "Implement save button and auto-save on reorder that calls PATCH API and handles loading/error states.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Debounced auto-save on drag end (1s delay). Manual Save button for form changes. Optimistic updates with rollback on error. Toast notifications for success/error. Refresh data on focus.",
+            "status": "pending",
+            "testStrategy": "Reorder → API call → position persists on reload. Form edit → save → data persists. Error handling shows toast."
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Build Weekly Pattern screen and API endpoints",
+        "description": "Week view for tagging mic/rest/creative/open nights with notes (REQ-004).",
+        "details": "Page `/app/week/page.tsx`. Grid: 7 days Mon-Sun. Tap cycles 4 modes. Optional note input. Schema: `weekly_patterns: pgTable('weekly_patterns', { userId: uuid(), weekday: integer(0-6), nightMode: text(), note: text() })`. Defaults DayPlan night_mode.",
+        "testStrategy": "Tag days → persists → Today screen defaults correctly. Note field single-line only.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define weekly_patterns database schema and migration",
+            "description": "Create Drizzle schema for weekly_patterns table with userId, weekday (0-6), nightMode, and note fields, including migration.",
+            "dependencies": [],
+            "details": "Use pgTable('weekly_patterns', { userId: uuid().notNull().references(() => users.id), weekday: integer().notNull().min(0).max(6), nightMode: text().notNull().default('open'), note: text() }). Add unique constraint on (userId, weekday). Run migration.",
+            "status": "pending",
+            "testStrategy": "Migration runs without errors. Insert duplicate (userId,weekday) fails. Query confirms indexes and defaults."
+          },
+          {
+            "id": 2,
+            "title": "Implement CRUD API endpoints for weekly_patterns",
+            "description": "Create GET/POST/PATCH route handlers for weekly_patterns with user auth, validation, and idempotency.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add /api/v1/weekly-patterns/route.ts and /api/v1/weekly-patterns/[weekday]/route.ts. Use Zod schema matching table. Idempotent POST/PATCH by userId+weekday. Return defaults from day_plans.night_mode if no pattern.",
+            "status": "pending",
+            "testStrategy": "POST creates new pattern idempotently. PATCH updates note/mode. GET returns user-specific week data or day_plans defaults."
+          },
+          {
+            "id": 3,
+            "title": "Build Week screen UI layout with 7-day grid",
+            "description": "Create /app/week/page.tsx with responsive grid displaying Mon-Sun days, using shadcn components and Tailwind.",
+            "dependencies": [],
+            "details": "Server Component with useSession. Grid: 7 cards in single row on desktop, stacked on mobile. Each day shows weekday name, current mode badge, and tap handler stub. Mobile-first max-w-md mx-auto.",
+            "status": "pending",
+            "testStrategy": "Page renders <1s SSR. Grid responsive across breakpoints. Days labeled Mon(0)-Sun(6) correctly."
+          },
+          {
+            "id": 4,
+            "title": "Add tap-to-cycle modes and note input functionality",
+            "description": "Implement tap interaction to cycle through mic/rest/creative/open modes and optional single-line note input per day.",
+            "dependencies": [
+              3
+            ],
+            "details": "Convert to Client Component or use server actions. Tap cycles: open→mic→rest→creative→open. Note: shadcn Input, single-line, save on blur/enter. Visual feedback with badges and animations.",
+            "status": "pending",
+            "testStrategy": "Tap cycles 4 modes correctly. Note input saves and displays. Keyboard navigation works (Tab/Enter)."
+          },
+          {
+            "id": 5,
+            "title": "Integrate API with UI and ensure Today screen compatibility",
+            "description": "Connect Week screen to API endpoints and verify integration with Today screen for default night_mode fallback.",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "Fetch/persist via API calls on load/tap/save. Today screen (Task 7) should query weekly_patterns first, fallback to day_plans.night_mode. Add optimistic updates. Handle loading/error states.",
+            "status": "pending",
+            "testStrategy": "End-to-end: Tag day → persists → Today screen reflects pattern over day_plans default. No pattern → uses day_plans.night_mode."
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Implement Reflection Entry form and API (REQ-005)",
+        "description": "Evening reset form capturing energy/anxiety/priorities/routine/mic/free-text.",
+        "details": "Page `/app/reflect/page.tsx` (evening only). Schema matches SQL spec. Form: 1-5 sliders (energy/anxiety), radio (hit_priorities), checkboxes (routine/mic), textareas (helped/hindered). Zod validation. POST `/api/v1/reflections`. ≤60s completion.",
+        "testStrategy": "Submit form → DB row created. Unique constraint (user,date) enforced. Form fills in <60s.",
+        "priority": "medium",
+        "dependencies": [
+          2,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define Zod schema for ReflectionEntry form",
+            "description": "Create comprehensive Zod validation schema matching SQL spec for all reflection fields including sliders, radio, checkboxes, and textareas.",
+            "dependencies": [],
+            "details": "Schema must validate: energy/anxiety (1-5 integers), hit_priorities (boolean), routine/mic (boolean arrays), helped/hindered (strings max 500 chars). Ensure required fields and data types match DB constraints.",
+            "status": "pending",
+            "testStrategy": "Run schema.parse() with valid/invalid data; assert passes valid, throws on invalid inputs like energy=6 or missing required fields."
+          },
+          {
+            "id": 2,
+            "title": "Implement reflection form UI in /app/reflect/page.tsx",
+            "description": "Build evening-only form with sliders for energy/anxiety, radio for priorities, checkboxes for routine/mic, textareas for free-text fields.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use shadcn/ui components: Slider(1-5), RadioGroup(yes/no), Checkbox groups, Textarea. Add labels, help text, ≤60s flow optimization. Client-side validation with Zod.",
+            "status": "pending",
+            "testStrategy": "Mount form, interact with all controls, verify values update state correctly and UI constraints enforced (sliders clamp 1-5)."
+          },
+          {
+            "id": 3,
+            "title": "Create POST /api/v1/reflections API endpoint",
+            "description": "Implement server-side route handler for creating reflection entries with Zod validation, auth, and DB insertion.",
+            "dependencies": [
+              1
+            ],
+            "details": "Route: /api/v1/reflections/route.ts. Validate with Zod schema, get userId from session, insert to reflection_entries table matching SQL schema. Handle unique(user,date) constraint.",
+            "status": "pending",
+            "testStrategy": "POST valid payload → 200 + DB row created. POST duplicate(user,date) → 409 conflict. Invalid payload → 400 validation errors."
+          },
+          {
+            "id": 4,
+            "title": "Connect form submission to API with error handling",
+            "description": "Implement form submission logic using server actions or fetch, handle success/error states, optimistic updates, and UX feedback.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Use react-hook-form + Zod resolver. On submit: POST to API, show loading, success toast/redirect, error messages for validation/network/dupe. Track form completion time.",
+            "status": "pending",
+            "testStrategy": "Submit valid → API called, success state, DB row. Submit invalid → client/server validation blocks. Submit dupe → conflict message shown."
+          },
+          {
+            "id": 5,
+            "title": "Add end-to-end testing and performance validation",
+            "description": "Implement integration tests verifying form submission creates DB row and enforces constraints; manually validate ≤60s completion.",
+            "dependencies": [
+              4
+            ],
+            "details": "Tests: full form submission → DB query confirms row with correct data. Unique constraint test: second submit same day fails. Performance: time form interactions.",
+            "status": "pending",
+            "testStrategy": "Cypress/Playwright: fill form <60s → DB row. Duplicate date submit → error. Verify all fields persisted correctly in reflection_entries table."
+          }
+        ]
+      },
+      {
+        "id": 15,
+        "title": "Create DisplayPayload generator logic",
+        "description": "Business logic to transform DayPlan + Routine into ≤2KB e-ink JSON (REQ-006 prep).",
+        "details": "Lib `/lib/display-payload.ts`: `function generatePayload(userId: string): Promise<DisplayPayload>`. Fetch today DayPlan → truncate priorities/routine → format date_label → humanize night_mode. Fallback: `{ state: 'not_planned' }`. ETag: hash(JSON.stringify(payload)).",
+        "testStrategy": "Unit test: no plan → not_planned. With plan → correct truncation. Payload <2KB. ETag consistent.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create DisplayPayload TypeScript interface",
+            "description": "Define the DisplayPayload interface with all required fields for e-ink display including state, date_label, truncated priorities, routine, and night_mode support.",
+            "dependencies": [],
+            "details": "In /lib/display-payload.ts, export interface DisplayPayload { state: 'not_planned' | 'planned'; date_label?: string; priorities?: Array<{id: string; title: string; truncated?: boolean}>; routine?: Array<{label: string; durationMinutes?: number}>; night_mode?: boolean; } Ensure JSON size awareness.",
+            "status": "pending",
+            "testStrategy": "Validate TypeScript compilation and JSON schema matches e-ink requirements."
+          },
+          {
+            "id": 2,
+            "title": "Implement DayPlan and Routine data fetching",
+            "description": "Create async functions to fetch today's DayPlan and user's Routine data from database using existing schemas from tasks 2, 3, 6.",
+            "dependencies": [],
+            "details": "Use Drizzle ORM queries: getTodayDayPlan(userId) and getRoutines(userId, ['morning', 'evening']). Handle no-data case returning null. Include display_sent_at check from task 11 integration.",
+            "status": "pending",
+            "testStrategy": "Mock DB responses: test with/without DayPlan, verify correct routine kinds fetched."
+          },
+          {
+            "id": 3,
+            "title": "Implement data truncation and formatting logic",
+            "description": "Truncate priorities and routine steps to ensure total JSON payload stays under 2KB limit with date_label formatting and night_mode humanization.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Create truncateForDisplay(data): limit priorities to top 5 (50 chars each), routine steps to essential label+duration (max 10 steps), format date_label as 'Tue Apr 28', detect night_mode from time/hour. Use recursive size checking.",
+            "status": "pending",
+            "testStrategy": "Unit test: payload sizes <2KB, truncation preserves critical info, date formats correctly."
+          },
+          {
+            "id": 4,
+            "title": "Implement generatePayload main function with fallback",
+            "description": "Build the core generatePayload(userId) function orchestrating fetch → truncate → format → ETag generation with not_planned fallback.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "async function generatePayload(userId): fetch data → if no plan return {state: 'not_planned'} → else transform → compute ETag: crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex'). Return {payload, eTag}.",
+            "status": "pending",
+            "testStrategy": "End-to-end: no plan → not_planned state. With plan → full payload <2KB. Same input → same ETag."
+          },
+          {
+            "id": 5,
+            "title": "Add comprehensive unit tests and validation",
+            "description": "Write unit tests covering all paths: no plan fallback, truncation, size limits, ETag consistency, and edge cases.",
+            "dependencies": [
+              4
+            ],
+            "details": "Use Vitest: test('no plan', async () => expect(await generatePayload('no-plan')).toEqual({state: 'not_planned'})); test('full payload <2KB'); test('ETag consistent'); Mock all DB calls. Add payload size validator utility.",
+            "status": "pending",
+            "testStrategy": "100% branch coverage. Verify ETag hash matches. Test boundary: exactly 2KB payload truncates correctly."
+          }
+        ]
+      },
+      {
+        "id": 16,
+        "title": "Implement GET /api/v1/display/today with device-token auth",
+        "description": "Display endpoint with ETag support and device-scoped authentication (REQ-006).",
+        "details": "Route handler with `Authorization: Bearer <device_token>`. Verify token in `device_tokens` table (scope: 'display:read'). Return DisplayPayload + ETag. Support `If-None-Match` → 304. p95 <200ms via connection pooling. Graceful 503 on DB failure.",
+        "testStrategy": "curl with valid token → 200 payload. Invalid token → 401. ETag match → 304. Load test 1000 reqs <200ms p95.",
+        "priority": "high",
+        "dependencies": [
+          15
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create GET /api/v1/display/today route handler",
+            "description": "Set up the Express.js route handler for GET /api/v1/display/today that extracts Authorization Bearer device token from headers.",
+            "dependencies": [],
+            "details": "In routes/display.ts: app.get('/api/v1/display/today', async (req, res) => { const token = req.headers.authorization?.replace('Bearer ', ''); ... }). Add middleware for ETag/If-None-Match header parsing.",
+            "status": "pending",
+            "testStrategy": "curl -H 'Authorization: Bearer valid_token' → route hit logged. Missing header → 401 early."
+          },
+          {
+            "id": 2,
+            "title": "Implement device token verification middleware",
+            "description": "Verify device_token exists in device_tokens table with scope 'display:read' using connection pooling.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create middleware verifyDeviceToken(req, res, next): Query `SELECT device_id FROM device_tokens WHERE token = $1 AND scope @> 'display:read' AND expires_at > NOW()`. req.deviceId = result.device_id. Use pg-pool for p95<200ms.",
+            "status": "pending",
+            "testStrategy": "Valid token → middleware passes with req.deviceId. Invalid/expired/missing scope → 401 Unauthorized."
+          },
+          {
+            "id": 3,
+            "title": "Fetch and cache today's DisplayPayload with ETag",
+            "description": "Query today's display data scoped to verified device, generate ETag from content hash, support DB connection pooling.",
+            "dependencies": [
+              2
+            ],
+            "details": "In handler: const today = new Date().toISOString().split('T')[0]; Query day_plans JOIN users ON device_id for date=today. Compute etag = crypto.createHash('md5').update(JSON.stringify(payload)).digest('hex'). Return { ...DisplayPayload, etag }.",
+            "status": "pending",
+            "testStrategy": "Fresh data → 200 with ETag in response. Verify payload matches day_plans for device."
+          },
+          {
+            "id": 4,
+            "title": "Add ETag If-None-Match 304 support",
+            "description": "Compare client If-None-Match header with generated ETag, return 304 Not Modified if match.",
+            "dependencies": [
+              3
+            ],
+            "details": "Before sending response: if (req.headers['if-none-match'] === etag) { return res.status(304).end(); }. Set res.set('ETag', etag) on 200 responses. Handle weak etags with W/ prefix if needed.",
+            "status": "pending",
+            "testStrategy": "curl -H 'If-None-Match: exact_etag' → 304. Mismatch → 200 new ETag. No header → 200 always."
+          },
+          {
+            "id": 5,
+            "title": "Add error handling, 503 on DB failure, performance tests",
+            "description": "Implement graceful DB error handling returning 503 Service Unavailable, run load tests for p95<200ms.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Wrap DB queries in try/catch: if (dbError) { logger.error(); return res.status(503).json({error: 'Service temporarily unavailable'}); }. Load test: artillery run 1000 reqs/sec → p95 response <200ms via connection pool.",
+            "status": "pending",
+            "testStrategy": "Simulate DB timeout → 503 JSON. Load test 1000 concurrent → p95<200ms, no connection exhaustion."
+          }
+        ]
+      },
+      {
+        "id": 17,
+        "title": "Create device_tokens table and management UI",
+        "description": "Store revocable device tokens and settings page to issue/revoke (REQ-007).",
+        "details": "Schema: `device_tokens: pgTable('device_tokens', { id: uuid().primaryKey(), userId: uuid().references(() => users.id), token: text().notNull(), scope: text().default('display:read'), revokedAt: timestamp(), createdAt: timestamp().defaultNow() })`. UI `/app/settings/device`: generate `crypto.randomUUID() + Date.now()`, copy-to-clipboard. DELETE endpoint.",
+        "testStrategy": "Generate token → curl display endpoint succeeds → revoke → 401. One token per user.",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          5,
+          16
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add device_tokens schema to database",
+            "description": "Define and migrate the device_tokens table using the provided Drizzle schema definition.",
+            "dependencies": [],
+            "details": "In schema file, add: device_tokens: pgTable('device_tokens', { id: uuid().primaryKey(), userId: uuid().references(() => users.id), token: text().notNull(), scope: text().default('display:read'), revokedAt: timestamp(), createdAt: timestamp().defaultNow() }). Run migration with drizzle-kit generate:pg and push to Neon.",
+            "status": "pending",
+            "testStrategy": "Query table schema in Neon DB console. Verify foreign key to users.id exists and all columns match spec."
+          },
+          {
+            "id": 2,
+            "title": "Create DELETE /api/device-tokens/[id] endpoint",
+            "description": "Implement server action or API route to revoke device token by setting revokedAt timestamp.",
+            "dependencies": [
+              1
+            ],
+            "details": "In app/api/device-tokens/[id]/route.ts or server action: Auth check → Verify user owns token → UPDATE device_tokens SET revokedAt=now() WHERE id=$1 AND userId=$userId → Return 200. Use Drizzle for query.",
+            "status": "pending",
+            "testStrategy": "Create token → DELETE call → Verify revokedAt is set → Try using revoked token → Expect 401."
+          },
+          {
+            "id": 3,
+            "title": "Build /app/settings/device page layout",
+            "description": "Create settings page UI structure using shadcn/ui components for device token management.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use Page with Card containing heading 'Device Tokens', Button to generate new token, Table/DataTable listing user's tokens with revoke buttons. Fetch tokens via server component with useSession(). Mobile responsive.",
+            "status": "pending",
+            "testStrategy": "Page renders without errors. Empty state shows when no tokens. Responsive on mobile."
+          },
+          {
+            "id": 4,
+            "title": "Implement token generation with copy-to-clipboard",
+            "description": "Add functionality to generate unique tokens and provide copy button for user convenience.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Server action: const token = crypto.randomUUID() + Date.now(). Insert to DB with userId. Client: Button 'Generate New Token' → call action → show toast with token → CopyButton using navigator.clipboard.writeText(token).",
+            "status": "pending",
+            "testStrategy": "Click generate → Token appears in DB → Copy button copies correctly → Paste verifies full token."
+          },
+          {
+            "id": 5,
+            "title": "Add token listing and revoke functionality to UI",
+            "description": "Display user's tokens in table with revoke action integrating DELETE endpoint.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Server component fetches non-revoked tokens for current user. DataTable columns: token (truncated), scope, createdAt (relative), revoke Button → optimistic update → call DELETE → refetch/invalidate queries. Confirmation dialog before revoke.",
+            "status": "pending",
+            "testStrategy": "Full flow: Generate token → List shows → Revoke → Disappears from list → DB revokedAt set. One token per user limit if specified."
+          }
+        ]
+      },
+      {
+        "id": 18,
+        "title": "Add Not-Today capture field to DayPlan",
+        "description": "Single-line release field that clears daily (REQ-009).",
+        "details": "Add to Today screen: shadcn Input placeholder='What won't get done today' maxLength=200. PATCH to DayPlan.not_today. Auto-clear on next day DayPlan creation.",
+        "testStrategy": "Enter text → persists → next day cleared. Character limit enforced.",
+        "priority": "low",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update DayPlan schema to include not_today field",
+            "description": "Add not_today text field to day_plans table schema matching existing pattern from Task 2.",
+            "dependencies": [],
+            "details": "Extend Drizzle schema: notToday: text().$default(''). Update migration to add column with default empty string. Ensure nullable for backward compatibility.",
+            "status": "pending",
+            "testStrategy": "Run migration on test DB. Verify column exists with empty default via SQL query."
+          },
+          {
+            "id": 2,
+            "title": "Extend DayPlan PATCH endpoint for not_today updates",
+            "description": "Update existing PATCH /api/v1/day-plans/[id] to accept and persist not_today field.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add to Zod schema: notToday: z.string().max(200).optional(). Update SQL UPDATE query to include not_today = $n. Use idempotency check from Task 6.",
+            "status": "pending",
+            "testStrategy": "PATCH with not_today → verify persists in DB for correct user/date."
+          },
+          {
+            "id": 3,
+            "title": "Add shadcn Input field to Today screen",
+            "description": "Integrate single-line input for 'What won't get done today' on Today screen UI.",
+            "dependencies": [],
+            "details": "Use shadcn Input component: placeholder='What won't get done today', maxLength=200. Position below work priorities. Bind to local state for input.",
+            "status": "pending",
+            "testStrategy": "Input renders with placeholder. Typing shows live chars. Max 200 chars enforced."
+          },
+          {
+            "id": 4,
+            "title": "Implement save functionality for not_today field",
+            "description": "Connect Today screen Input to PATCH DayPlan.not_today on blur/save.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Add onBlur/onSave handler calling PATCH endpoint with {not_today: inputValue}. Show loading/success toast. Debounce rapid changes.",
+            "status": "pending",
+            "testStrategy": "Enter text → save → refresh page → text persists. Empty input clears field."
+          },
+          {
+            "id": 5,
+            "title": "Implement auto-clear of not_today on next day creation",
+            "description": "Ensure not_today defaults to empty when new DayPlan created for next date.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "POST /api/v1/day-plans idempotency logic sets not_today='' for new date. Verify GET today returns cleared field after midnight transition.",
+            "status": "pending",
+            "testStrategy": "Set not_today today → create tomorrow DayPlan → verify tomorrow not_today empty."
+          }
+        ]
+      },
+      {
+        "id": 19,
+        "title": "Implement evening routine swap logic (18:00 cutoff)",
+        "description": "Configurable cutoff replaces morning routine card with evening after 18:00.",
+        "details": "User setting `evening_cutoff: 18` (default). Today screen: `hour >= evening_cutoff ? 'evening' : 'morning'`. Configurable via settings page.",
+        "testStrategy": "Manual time override → correct routine. Config change persists.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Add evening_cutoff user setting to database schema",
+            "description": "Extend users table with evening_cutoff integer column defaulting to 18.",
+            "dependencies": [],
+            "details": "Use Drizzle migration: addColumn(users, 'evening_cutoff', integer().default(18).notNull()). Update TypeScript interfaces for user profile.",
+            "status": "pending",
+            "testStrategy": "Migration runs without errors. Query shows default 18 for existing users."
+          },
+          {
+            "id": 2,
+            "title": "Create API endpoint to update evening_cutoff setting",
+            "description": "Implement PATCH /api/v1/users/settings with Zod validation for evening_cutoff (0-23 range).",
+            "dependencies": [
+              1
+            ],
+            "details": "Route handler in /api/v1/users/[id]/settings/route.ts. Validate z.number().int().min(0).max(23). Update user.evening_cutoff atomically.",
+            "status": "pending",
+            "testStrategy": "PATCH request updates value. Invalid values (24, -1) rejected with 400 error."
+          },
+          {
+            "id": 3,
+            "title": "Build settings page UI for evening_cutoff configuration",
+            "description": "Add time picker/slider in user settings page to adjust evening_cutoff with live preview.",
+            "dependencies": [
+              2
+            ],
+            "details": "React component with <input type='range' min='0' max='23'>. OnChange calls PATCH API. Display 'Switch to evening at {value}:00'. Persist in localStorage as fallback.",
+            "status": "pending",
+            "testStrategy": "Slider updates value 0-23. Change persists after refresh. Matches DB value."
+          },
+          {
+            "id": 4,
+            "title": "Modify Today screen routine logic to use configurable cutoff",
+            "description": "Replace hardcoded time check with user.evening_cutoff from server component props.",
+            "dependencies": [
+              1
+            ],
+            "details": "Server Component: const hour = new Date().getHours(); const routineType = hour >= user.evening_cutoff ? 'evening' : 'morning'; Fetch routine by routineType.",
+            "status": "pending",
+            "testStrategy": "Mock user.evening_cutoff=16 → switches at 16:00. Matches Task 10 time-aware display."
+          },
+          {
+            "id": 5,
+            "title": "Add manual time override and end-to-end tests",
+            "description": "Implement dev tool for time override. Test cutoff logic across settings changes.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "DevTools panel: <input type='time'> override. E2E: Change cutoff → navigate Today → verify routine swap. Test persistence after reload.",
+            "status": "pending",
+            "testStrategy": "Time override shows correct routine. Settings change → Today screen updates immediately and persists."
+          }
+        ]
+      },
+      {
+        "id": 20,
+        "title": "Add mid-day re-center functionality",
+        "description": "Toggle priorities done, replace inline, show bonus banner when all complete (Story 2).",
+        "details": "Checkbox toggles priority_done[i]. Inline edit replaces text. All done: `<Banner>Bonus territory — extra is gift, not duty</Banner>`. Optimistic UI updates.",
+        "testStrategy": "Toggle done → API syncs. All complete → banner appears. Replace priority → persists.",
+        "priority": "medium",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend Zustand store for priority done states",
+            "description": "Add priority_done array to the existing priorities store and implement toggle action for marking priorities complete.",
+            "dependencies": [],
+            "details": "In the Zustand store from Task 8, add state: priority_done: [false, false, false], and action: togglePriorityDone(idx: number): set((state) => { state.priority_done[idx] = !state.priority_done[idx]; }). Ensure optimistic local update before API sync.",
+            "status": "pending",
+            "testStrategy": "Toggle checkbox → priority_done[idx] flips in store → console logs confirm state change."
+          },
+          {
+            "id": 2,
+            "title": "Add checkbox toggles to priority card UI",
+            "description": "Integrate shadcn Checkbox components next to each editable priority input for done state toggling.",
+            "dependencies": [
+              1
+            ],
+            "details": "In the 3-priority card component (Task 8), place Checkbox before/after each Input. Bind checked={priority_done[i]}, onCheckedChange={() => togglePriorityDone(i)}. Add visual feedback: strikethrough text or opacity when done. Use optimistic UI.",
+            "status": "pending",
+            "testStrategy": "Click checkbox → input text strikes through → mobile touch target ≥44px."
+          },
+          {
+            "id": 3,
+            "title": "Implement API sync for priority done toggles",
+            "description": "Update PATCH endpoint call to include priority_done array on checkbox toggle and input blur.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "On togglePriorityDone and input blur, call fetch('/api/v1/day-plans/today', { method: 'PATCH', body: JSON.stringify({ work_priorities, priority_done }) }). Handle success/error: optimistic update on call, revert on error.",
+            "status": "pending",
+            "testStrategy": "Toggle → Network tab shows PATCH with priority_done → server confirms sync."
+          },
+          {
+            "id": 4,
+            "title": "Create bonus banner component",
+            "description": "Build shadcn Banner component displaying 'Bonus territory — extra is gift, not duty' with celebratory styling.",
+            "dependencies": [],
+            "details": "Use shadcn Banner or Alert with success variant, green accent colors, confetti icon or animation. Conditional render prop: showBonus={all priorities done}. Position: below priority cards on Today screen.",
+            "status": "pending",
+            "testStrategy": "Render with showBonus=true → banner visible with correct text and styling."
+          },
+          {
+            "id": 5,
+            "title": "Integrate bonus banner logic and display",
+            "description": "Conditionally show banner when all priority_done are true, using optimistic UI updates.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "In Today screen component, compute const allDone = priority_done.every(Boolean). Pass showBonus={allDone} to Banner. Hide banner if any priority_done false or on day change. Ensure re-renders on store changes.",
+            "status": "pending",
+            "testStrategy": "Toggle all 3 done → banner appears. Toggle one undone → banner hides. Page refresh after API sync → banner persists correctly."
+          }
+        ]
+      },
+      {
+        "id": 21,
+        "title": "Implement tomorrow draft capture in reflection flow",
+        "description": "Evening reflection offers 3-bullet tomorrow draft (REQ-011).",
+        "details": "Extend reflection form: 3 textarea suggestions. Store in `reflection_entries.tomorrow_draft: jsonb`. Next day Today screen shows as *suggestion* (not autofill): 'Suggested: ... [use?]'.",
+        "testStrategy": "Reflection → tomorrow shows suggestions. User can ignore/adopt independently.",
+        "priority": "low",
+        "dependencies": [
+          14
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Extend reflection form with 3 tomorrow draft textareas",
+            "description": "Add three textarea fields to the evening reflection form for capturing user's tomorrow draft suggestions as bullet points.",
+            "dependencies": [],
+            "details": "Update the reflection form component to include 3 labeled textareas (e.g., 'Tomorrow bullet 1', '2', '3'). Use controlled inputs with state management (e.g., React useState). Ensure responsive design matching existing form styling. Limit each to reasonable length (e.g., 200 chars).",
+            "status": "pending",
+            "testStrategy": "Form renders 3 textareas. Typing updates local state. Form validation passes with empty/partial inputs."
+          },
+          {
+            "id": 2,
+            "title": "Update reflection entry API to store tomorrow_draft as JSONB",
+            "description": "Modify the reflection_entries POST/PATCH endpoints to capture and persist the 3 tomorrow draft bullets in a new jsonb column.",
+            "dependencies": [],
+            "details": "Add `tomorrow_draft: jsonb` to schema/migration if missing. In API handler, collect textarea values as array `[{bullet1}, {bullet2}, {bullet3}]` or simple `['bullet1', 'bullet2', 'bullet3']`. Use Zod schema extension: `z.array(z.string()).length(3).optional()`. Store on reflection entry creation/update.",
+            "status": "pending",
+            "testStrategy": "POST reflection with tomorrow_draft → DB query confirms jsonb array stored correctly. Empty array stored as []."
+          },
+          {
+            "id": 3,
+            "title": "Create database migration for reflection_entries.tomorrow_draft",
+            "description": "Add jsonb column `tomorrow_draft` to reflection_entries table with proper nullability and index.",
+            "dependencies": [],
+            "details": "Drizzle migration: `addColumn(reflection_entries, 'tomorrow_draft', jsonb().default('[]').notNull())`. Add GIN index: `index('reflection_entries_tomorrow_draft_idx').on(reflection_entries.tomorrow_draft)`. Ensure backward compatible (nulls allowed initially). Run migration on dev/test DB.",
+            "status": "pending",
+            "testStrategy": "Migration runs without errors. Column exists with jsonb type. Insert/select jsonb data succeeds. Index visible in DB."
+          },
+          {
+            "id": 4,
+            "title": "Implement Today screen suggestion display from prior reflection",
+            "description": "Fetch previous day's reflection_entries.tomorrow_draft and display as non-editable suggestions on Today screen.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Server Component query: `SELECT tomorrow_draft FROM reflection_entries WHERE user_id = $1 AND date = $2::date - INTERVAL '1 day' ORDER BY created_at DESC LIMIT 1`. Render as: `<div>Suggested: {bullet1} <button>[use]</button></div>` for each. Style as italic/low-opacity. Match local date logic from Task 6.",
+            "status": "pending",
+            "testStrategy": "Prior day has draft → Today shows 'Suggested: ... [use?]'. No prior draft → no suggestions. Timezone correct."
+          },
+          {
+            "id": 5,
+            "title": "Add [use?] button handler to adopt suggestions into day plan",
+            "description": "Implement click handler for suggestion buttons that copies bullet text into current day_plan work_priorities without replacing existing.",
+            "dependencies": [
+              1,
+              4
+            ],
+            "details": "Button onClick: call day plan PATCH API with updated `work_priorities` merging suggestion into first empty slot or append. Use server action or fetch(`/api/v1/day-plans/today`). Toast feedback: 'Added to priorities'. No auto-replace; user chooses slot. Optimistic UI update.",
+            "status": "pending",
+            "testStrategy": "Click [use?] → day_plans.work_priorities updates with suggestion text. Empty plan fills correctly. Existing priorities → appends/appends to empty slots. API idempotent."
+          }
+        ]
+      },
+      {
+        "id": 22,
+        "title": "ESP32 firmware Wi-Fi captive portal provisioning",
+        "description": "Initial device setup via Wi-Fi AP + captive portal (REQ-008).",
+        "details": "Arduino-ESP32 v3.0.0. WiFiAP + DNSServer for captive portal. Web form collects SSID/password + device token. Store NVS: `preferences.putString('ssid', ssid); preferences.putString('token', token);`. Reference: Waveshare 4.2\" e-ink.",
+        "testStrategy": "Connect to AP → enter creds/token → stores NVS → reboots to station mode.",
+        "priority": "high",
+        "dependencies": [
+          17
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Wi-Fi scan and AP startup with DNS server",
+            "description": "Set up ESP32 in AP_STA mode to scan networks, then switch to pure AP mode with DNS server for captive portal redirection.",
+            "dependencies": [],
+            "details": "Use WiFi.mode(WIFI_AP_STA); WiFi.scanNetworks() to cache up to 8 SSIDs. Switch to WIFI_AP, WiFi.softAP('ESP32-Setup'), dnsServer.start(53, '*', WiFi.softAPIP()). Handle captive probes like /generate_204.[1]",
+            "status": "pending",
+            "testStrategy": "Verify AP starts, scan finds networks, DNS redirects all queries to AP IP via serial logs."
+          },
+          {
+            "id": 2,
+            "title": "Create WebServer with main page and network selection form",
+            "description": "Set up WebServer on port 80 with root page displaying scanned SSIDs dropdown and fields for password and device token.",
+            "dependencies": [
+              1
+            ],
+            "details": "server.on('/', showMainPage) with HTML form: <select> for SSIDs from networks[], <input> for password/token. Include Waveshare 4.2in e-ink reference styling if applicable. server.onNotFound(showMainPage).[1]",
+            "status": "pending",
+            "testStrategy": "Connect to AP, load /, confirm scanned SSIDs populate dropdown and form fields render."
+          },
+          {
+            "id": 3,
+            "title": "Handle form submission and store credentials in NVS",
+            "description": "Process POST /connect, validate inputs, save SSID, password, and token to Preferences NVS namespace.",
+            "dependencies": [
+              2
+            ],
+            "details": "server.on('/connect', HTTP_POST, handleConnect): preferences.begin('prov', true); preferences.putString('ssid', ssid); putString('pass', pass); putString('token', token); preferences.end(); Set flag shouldConnectToWiFi=true.[1]",
+            "status": "pending",
+            "testStrategy": "Submit form, check serial logs confirm storage, verify preferences.getString() retrieves values."
+          },
+          {
+            "id": 4,
+            "title": "Implement boot sequence and station mode connection logic",
+            "description": "In setup(), check NVS for credentials; if present connect in STA mode, else start AP provisioning.",
+            "dependencies": [
+              3
+            ],
+            "details": "connectToStoredWiFi(): Load from NVS, WiFi.mode(WIFI_STA); WiFi.begin(ssid, pass); timeout 10s, fail→restart AP. setup(): connectToStoredWiFi() then setupAP() if not connected.[1]",
+            "status": "pending",
+            "testStrategy": "Flash firmware, power cycle: no creds→AP starts; after provisioning→auto connects to WiFi."
+          },
+          {
+            "id": 5,
+            "title": "Add captive portal probes and complete server handlers",
+            "description": "Implement all platform-specific captive portal redirects and success page with reboot trigger.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Add handlers: /generate_204, /hotspot-detect.html, /ncsi.txt, /fwlink → redirectRoot(). After save creds, show success page with <script>ESP.restart()</script> delay. server.begin().[1]",
+            "status": "pending",
+            "testStrategy": "Test on iOS/Android/Windows: auto-redirect to portal on connect, submit creds→reboot→STA connect."
+          }
+        ]
+      },
+      {
+        "id": 23,
+        "title": "ESP32 display endpoint polling and JSON parsing",
+        "description": "15-minute polling cycle with HTTPClient + ArduinoJson (REQ-008).",
+        "details": "ArduinoJson 7.0.3 + HTTPClient. `if (millis() - lastPoll > 15*60*1000) { http.GET(\"/api/v1/display/today\", token); parse payload; }`. Handle 304, errors, not_planned. Configurable interval via NVS.",
+        "testStrategy": "Mock server → polls correctly → parses JSON → handles errors gracefully.",
+        "priority": "high",
+        "dependencies": [
+          16,
+          22
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement NVS storage for configurable polling interval",
+            "description": "Create non-volatile storage to read and write the polling interval in minutes, defaulting to 15 minutes.",
+            "dependencies": [],
+            "details": "Use ESP32 NVS library to create a namespace 'display' with key 'poll_interval_min'. Read on boot, validate range 5-60 min, fallback to 15. Write function for future config changes via WiFi or button.",
+            "status": "pending",
+            "testStrategy": "Verify read/write persistence after reboot. Check invalid values fallback to default. Serial log values."
+          },
+          {
+            "id": 2,
+            "title": "Add HTTP polling timer logic with configurable interval",
+            "description": "Implement millis()-based timer that triggers every poll_interval_ms, tracking lastPoll time.",
+            "dependencies": [
+              1
+            ],
+            "details": "Declare unsigned long lastPoll = 0; In loop(): if (millis() - lastPoll > poll_interval_ms) { triggerPoll(); lastPoll = millis(); }. Handle millis() overflow. Use uint32_t for interval from NVS.",
+            "status": "pending",
+            "testStrategy": "Manual timer test: advance millis(), verify trigger exactly at interval. Check overflow safety."
+          },
+          {
+            "id": 3,
+            "title": "Implement HTTP GET request with device token and ETag support",
+            "description": "Send authenticated GET to /api/v1/display/today with Bearer token, handle 304 Not Modified response.",
+            "dependencies": [
+              2
+            ],
+            "details": "Use HTTPClient: setUrl(), addHeader('Authorization', 'Bearer ' + token), addHeader('If-None-Match', currentETag). Check httpCode: 200→parse, 304→skip, others→error. Store new ETag from 'ETag' header.",
+            "status": "pending",
+            "testStrategy": "Mock server: valid token→200, invalid→401, ETag match→304. Verify ETag storage."
+          },
+          {
+            "id": 4,
+            "title": "Parse DisplayPayload JSON with ArduinoJson 7.0.3",
+            "description": "Deserialize HTTP response body into structured DisplayPayload, handle 'not_planned' state.",
+            "dependencies": [
+              3
+            ],
+            "details": "Use ArduinoJson 7: DeserializationError err = deserializeJson(doc, payload); if(err) error. Extract fields: doc['state'], doc['date_label'], doc['priorities'], doc['routine']. Handle missing fields gracefully.",
+            "status": "pending",
+            "testStrategy": "Unit test with mock JSON strings: valid payload, not_planned, malformed→error logged."
+          },
+          {
+            "id": 5,
+            "title": "Add comprehensive error handling and logging",
+            "description": "Handle WiFi disconnect, HTTP errors, JSON parse failures, and log status for debugging.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "In triggerPoll(): WiFi.status()!=WL_CONNECTED→log/retry. httpCode!=200&&304→log code. Parse fail→log 'JSON parse error'. Success→log 'Poll OK, state: X'. Retry logic: 3 attempts max.",
+            "status": "pending",
+            "testStrategy": "Simulate failures: disconnect WiFi→retry log, bad JSON→parse error, 500→HTTP error logged."
+          }
+        ]
+      },
+      {
+        "id": 24,
+        "title": "E-ink rendering layout for Waveshare 4.2-inch panel",
+        "description": "Static layout: date + 3 priorities + 4 routine steps + night mode (REQ-008).",
+        "details": "GxEPD2_154c (Waveshare 4.2\"). Layout: date y=10, priorities y=40/70/100, routine y=140, night_mode y=220. GxEPD2_3C font 16pt. Partial refresh. Battery: update only changed content.",
+        "testStrategy": "Render test payloads → correct layout. Partial refresh works. Text truncation handled.",
+        "priority": "high",
+        "dependencies": [
+          23
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize GxEPD2_154c display driver",
+            "description": "Set up the Waveshare 4.2-inch e-ink display using GxEPD2_154c library with correct SPI pins and resolution 400x300.",
+            "dependencies": [],
+            "details": "Include GxEPD2 library, instantiate GxEPD2_154c with SPI pins (MOSI=23, MISO=19, SCK=18, CS=5, DC=17, RST=16, BUSY=4). Set rotation for portrait mode. Test init() and power on.",
+            "status": "pending",
+            "testStrategy": "Verify display powers on without errors, check hello world text renders at default position."
+          },
+          {
+            "id": 2,
+            "title": "Create layout functions for date and priorities",
+            "description": "Implement rendering functions for date at y=10 and 3 priorities at y=40/70/100 using GxEPD2_3C 16pt font.",
+            "dependencies": [
+              1
+            ],
+            "details": "Define setFont(GxEPD2_3C); setTextColor; setCursor(10,10) for date, then priorities with setCursor(x=10,y=40/70/100). Handle string truncation if exceeds 400px width. Use getTextBounds for positioning.",
+            "status": "pending",
+            "testStrategy": "Render static date '2026-04-28' and priorities 'Priority 1\nPriority 2\nPriority 3'. Verify vertical positions and font size."
+          },
+          {
+            "id": 3,
+            "title": "Implement routine steps rendering with time-aware logic",
+            "description": "Render 4 routine steps at y=140, fetching morning/evening based on hour <14 or task 19 cutoff, truncate to 4 lines.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Integrate routine data from task 10/19 API. Use getHours() <14 ? morning : evening. setCursor(10,140), loop 4 steps as bullet list with GxEPD2_3C 16pt. Handle low-energy minimum_version.",
+            "status": "pending",
+            "testStrategy": "Mock time 10AM (morning) vs 20PM (evening), verify 4 steps display correctly truncated at y=140."
+          },
+          {
+            "id": 4,
+            "title": "Add night mode toggle and battery indicator",
+            "description": "Render night_mode status at y=220, detect battery changes and implement partial refresh for updates only.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "setCursor(10,220) for 'Night Mode: ON/OFF' based on user setting. Use display.partialUpdate() for changed regions. Track dirty rectangles for date/priorities/routine/battery. Battery voltage via analogRead.",
+            "status": "pending",
+            "testStrategy": "Toggle night mode, change battery level, verify only changed area refreshes without ghosting."
+          },
+          {
+            "id": 5,
+            "title": "Integrate full layout refresh cycle and optimization",
+            "description": "Combine all elements into single render function with partial refresh, ensure full refresh every 180s per e-ink guidelines.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "details": "Create updateDisplay() calling all sections, use firstPage()/nextPage() loop. Track last refresh time, force full refresh if >180s. Optimize for low power: standby after update. Depends on task 23 data fetch.",
+            "status": "pending",
+            "testStrategy": "Full layout render test payloads. Verify partial works on single change, full refresh clears ghosts. Check power: standby <0.017mW."
+          }
+        ]
+      },
+      {
+        "id": 25,
+        "title": "ESP32 deep sleep and battery optimization",
+        "description": "≥14 days battery life on 2000mAh with 15-min polls (REQ-008).",
+        "details": "ESP32 deep sleep: `esp_deep_sleep_start()` after poll/render. Wake every 15min: RTC alarm. Current: ~10uA sleep, 100mA poll/render → 14+ days. NVS fallback to last-good payload if >24h offline.",
+        "testStrategy": "Battery drain test: verify <10uA sleep current. Survives 24h offline → renders last payload.",
+        "priority": "high",
+        "dependencies": [
+          24
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement 15-minute RTC deep sleep wake-up timer",
+            "description": "Configure ESP32 RTC alarm to wake device precisely every 15 minutes (900 seconds) for polling cycle.",
+            "dependencies": [],
+            "details": "Use `esp_sleep_enable_timer_wakeup(15 * 60 * 1000000LL);` before `esp_deep_sleep_start()`. Ensure timer accuracy ±5% over 24h period. Handle wake cause verification with `esp_sleep_get_wakeup_cause()`.",
+            "status": "pending",
+            "testStrategy": "Log wake timestamps over 24h, verify interval 15min ±10s. Test timer drift after 100 cycles."
+          },
+          {
+            "id": 2,
+            "title": "Add NVS storage for last-good payload and offline timer",
+            "description": "Store parsed JSON payload in NVS with 24h offline timestamp. Fallback to last-good on startup if offline >24h.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use `nvs_set_str('last_payload', json_str); nvs_set_i32('last_poll', now());`. On boot: `if (now() - last_poll > 24*3600) render(last_payload);`. Partition: 'storage', key size limit 4000 bytes.",
+            "status": "pending",
+            "testStrategy": "Mock clock advance 25h, verify renders last payload. Clear NVS → fresh poll. Validate JSON parse after NVS read."
+          },
+          {
+            "id": 3,
+            "title": "Optimize poll/render cycle to <3 seconds active time",
+            "description": "Minimize WiFi connect + HTTP poll + JSON parse + display render to under 3s total before deep sleep.",
+            "dependencies": [
+              1
+            ],
+            "details": "Static IP, `WiFi.mode(WIFI_STA); WiFi.config(ip, gw, mask);`. HTTP timeout 2s. ArduinoJson minimal parse. Skip display if payload unchanged (CRC check). Target: 100mA × 3s = 0.083mAh/cycle.",
+            "status": "pending",
+            "testStrategy": "Time each phase with `millis()`. Verify total <3000ms over 50 cycles. Monitor current with INA219 during active phase."
+          },
+          {
+            "id": 4,
+            "title": "Verify and optimize deep sleep current to ≤10μA",
+            "description": "Achieve measured deep sleep current of 10μA or less by disabling peripherals and optimizing power circuit.",
+            "dependencies": [
+              1,
+              3
+            ],
+            "details": "GPIO0/2 pull-down, `esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);`. Disable WiFi/BT before sleep: `WiFi.disconnect(true); esp_bluedroid_disable();`. Remove LEDs, use low-IQ regulator.",
+            "status": "pending",
+            "testStrategy": "Multimeter serial measurement: confirm ≤10μA stable for 10min. Test across 3.0-4.2V battery range. Compare before/after optimizations."
+          },
+          {
+            "id": 5,
+            "title": "Validate 14+ day battery life and integrate full cycle",
+            "description": "Combine all components: poll→parse→render→NVS→sleep. Verify 2000mAh lasts ≥14 days (≤3.57mA average).",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Full cycle: wake→poll Task23 endpoint→parse→NVS update→render display→sleep 15min. Calculate: (100mA×3s + 10μA×897s)/900s ≈0.334mA avg → 2000mAh/0.334mA=5980h=249days theoretical.",
+            "status": "pending",
+            "testStrategy": "Accelerated test: 100 cycles (25h), measure total mAh drain, extrapolate to 14 days. Real 48h test confirms <0.4mA avg. Offline 24h→renders last payload."
+          }
+        ]
+      },
+      {
+        "id": 26,
+        "title": "Accessibility, performance, and polish pass",
+        "description": "WCAG 2.1 AA, p95<200ms APIs, mobile perf optimizations (Non-functional reqs).",
+        "details": "Lighthouse audit ≥90 all categories. axe-core accessibility scan. API tracing + Neon query perf. PWA manifest. Preload critical resources. Compress display payload gzip.",
+        "testStrategy": "Lighthouse 90+, axe 100% pass, Playwright E2E morning flow <90s, API load test p95<200ms.",
+        "priority": "medium",
+        "dependencies": [
+          11,
+          16,
+          25
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Run axe-core accessibility scan and fix violations",
+            "description": "Execute axe-core scan across all pages to identify WCAG 2.1 AA violations and implement fixes for all critical and serious issues.",
+            "dependencies": [],
+            "details": "Install axe-core via `npx @axe-core/cli@latest --url http://localhost:3000`. Target shadcn/ui components, forms, navigation. Fix keyboard traps, missing labels, contrast failures. Re-scan until 100% pass rate per test strategy.",
+            "status": "pending",
+            "testStrategy": "axe-core scan passes 100% on desktop/mobile. Manual keyboard navigation test: full site traversal without traps."
+          },
+          {
+            "id": 2,
+            "title": "Achieve Lighthouse 90+ across all categories",
+            "description": "Optimize for Lighthouse Performance, Accessibility, Best Practices, SEO ≥90 scores on mobile and desktop audits.",
+            "dependencies": [
+              1
+            ],
+            "details": "Run `npx lighthouse http://localhost:3000 --preset=performance --output=html`. Address Largest Contentful Paint, Cumulative Layout Shift, unused JS. Implement mobile-first Tailwind optimizations from Task 4.",
+            "status": "pending",
+            "testStrategy": "Lighthouse CI scores ≥90 all categories on Chrome mobile/desktop. Verify via repeated audits post-fixes."
+          },
+          {
+            "id": 3,
+            "title": "Implement API tracing and Neon query performance optimization",
+            "description": "Add tracing to all API routes and optimize Neon Postgres queries to meet p95<200ms under load.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use Next.js middleware or OpenTelemetry for API tracing. Analyze Drizzle ORM queries via Neon console. Add indexes on users table from Task 1, paginate results. Load test with Artillery simulating 100 concurrent users.",
+            "status": "pending",
+            "testStrategy": "API load test p95<200ms. Playwright E2E morning flow <90s. Verify via Neon query performance dashboard."
+          },
+          {
+            "id": 4,
+            "title": "Add PWA manifest, preload, and gzip compression",
+            "description": "Configure PWA manifest, preload critical resources, enable gzip compression for display payloads.",
+            "dependencies": [
+              2
+            ],
+            "details": "Create `/public/manifest.json` with name, icons, theme_color. Add `<link rel='manifest'>` to root layout. Preload fonts/CSS via `<link rel='preload'>`. Configure Next.js gzip in `next.config.js`: `compression()`. Compress ESP32 payloads.",
+            "status": "pending",
+            "testStrategy": "Chrome DevTools Application tab shows PWA installable. Network tab confirms preload hits and gzip encoding."
+          },
+          {
+            "id": 5,
+            "title": "Final polish: Mobile perf, contrast, keyboard, and E2E validation",
+            "description": "Apply final mobile performance optimizations, verify WCAG AA contrast/keyboard, run full E2E test suite.",
+            "dependencies": [
+              3,
+              4
+            ],
+            "details": "Tailwind mobile-first: ensure sm:640px breakpoints. Verify 4.5:1 contrast on shadcn components. Test focus indicators. Integrate with Auth.js (Task 5) protected routes. Run Playwright E2E for complete morning user flow.",
+            "status": "pending",
+            "testStrategy": "Full Lighthouse/axe regression. Playwright E2E <90s. Manual audit: keyboard-only, 200% zoom, screen reader announces all interactive elements."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2026-04-28T17:00:43.915Z",
+      "updated": "2026-04-28T17:00:43.915Z",
+      "description": "Tasks for master context"
+    }
+  }
+}
