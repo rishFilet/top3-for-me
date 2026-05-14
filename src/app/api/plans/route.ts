@@ -3,7 +3,7 @@ import { auth } from '@/lib/auth'
 import sql from '@/lib/db'
 import { Plan } from '@/lib/types'
 
-async function ensureTables() {
+export async function ensureTables() {
   await sql`
     CREATE TABLE IF NOT EXISTS plans (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -11,17 +11,27 @@ function progressToMap(rows: PlanProgressEntry[]): ProgressMap {
   return m
 }
 
+function toDatePart(iso: string): string {
+  return iso.slice(0, 10)
+}
+
 function daysBetween(startISO: string, endISO: string): number {
-  const a = new Date(startISO + 'T00:00:00Z').getTime()
-  const b = new Date(endISO + 'T00:00:00Z').getTime()
+  const a = new Date(toDatePart(startISO) + 'T00:00:00Z').getTime()
+  const b = new Date(toDatePart(endISO) + 'T00:00:00Z').getTime()
   return Math.round((b - a) / (1000 * 60 * 60 * 24)) + 1
 }
 
 function dayNumberToday(startISO: string): number {
-  const start = new Date(startISO + 'T00:00:00Z').getTime()
+  const start = new Date(toDatePart(startISO) + 'T00:00:00Z').getTime()
   const now = new Date()
   const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())).getTime()
   return Math.floor((today - start) / (1000 * 60 * 60 * 24)) + 1
+}
+
+function formatDate(iso: string): string {
+  return new Date(toDatePart(iso) + 'T00:00:00Z').toLocaleDateString('en-CA', {
+    month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC',
+  })
 }
 
 export default function PlanPage() {
@@ -76,7 +86,7 @@ export default function PlanPage() {
         <h1 className="text-2xl font-semibold">{p.meta.title}</h1>
         <p className="text-sm text-gray-600 mt-1">{p.meta.intention}</p>
         <p className="text-xs text-gray-500 mt-2">
-          Day {dayN} of {totalDays} &middot; {plan.startDate} → {plan.endDate}
+          Day {dayN} of {totalDays} &middot; {formatDate(plan.startDate)} → {formatDate(plan.endDate)}
         </p>
       </header>
 
