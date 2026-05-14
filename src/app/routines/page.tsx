@@ -47,7 +47,7 @@ interface SortableCardProps {
 }
 
 function SortableCard({ routine, isFirst, onDelete }: SortableCardProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
     id: routine.id,
   })
 
@@ -63,12 +63,13 @@ function SortableCard({ routine, isFirst, onDelete }: SortableCardProps) {
       <div
         ref={setNodeRef}
         style={style}
+        {...attributes}
         className="md:col-span-8 bg-[#F4EBD0] border-2 border-stone-600 rounded-xl p-8 shadow-[6px_6px_0px_0px_rgba(229,217,182,1)] flex flex-col"
       >
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <button
-              {...attributes}
+              ref={setActivatorNodeRef}
               {...listeners}
               className="text-stone-400 hover:text-stone-600 cursor-grab active:cursor-grabbing touch-none"
               aria-label="Drag to reorder"
@@ -108,12 +109,13 @@ function SortableCard({ routine, isFirst, onDelete }: SortableCardProps) {
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
       className="md:col-span-4 bg-[#F4EBD0] border-2 border-stone-400 rounded-xl p-6 shadow-[4px_4px_0px_0px_rgba(229,217,182,1)] flex flex-col"
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <button
-            {...attributes}
+            ref={setActivatorNodeRef}
             {...listeners}
             className="text-stone-400 hover:text-stone-600 cursor-grab active:cursor-grabbing touch-none"
             aria-label="Drag to reorder"
